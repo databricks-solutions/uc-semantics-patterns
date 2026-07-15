@@ -1,5 +1,8 @@
-*conf*.json
 .DS_Store
-__pycache__
-.idea/
-.env
+_*.*
+**/*.zip
+**/*.log
+_*/*.*
+**/.DS_Store
+
+0-Template

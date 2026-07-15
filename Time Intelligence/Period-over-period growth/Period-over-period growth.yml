@@ -1,0 +1,282 @@
+version: 1.1
+comment: Unity Catalog semantics patterns
+
+source: orders
+
+joins:
+  - name: customer
+    source: customer
+    'on': source.o_custkey = customer.c_custkey
+    rely:
+      at_most_one_match: true
+    joins:
+        - name: nation
+          source: nation
+          'on': customer.c_nationkey = nation.n_nationkey
+          rely:
+            at_most_one_match: true
+          joins:
+            - name: region
+              source: region
+              'on': nation.n_regionkey = region.r_regionkey
+              rely:
+                at_most_one_match: true
+
+fields:
+  - name: RegionName
+    display_name: Region Name
+    expr: customer.nation.region.r_name
+
+  - name: CountryName
+    display_name: Country Name
+    expr: customer.nation.n_name
+
+  - name: CustomerName
+    display_name: Customer Name
+    expr: customer.c_name
+
+  - name: MarketSegment
+    display_name: Market Segment
+    expr: customer.c_mktsegment
+
+  - name: OrderDate
+    display_name: Order Date
+    expr: o_orderdate
+    format: 
+      type: date
+      date_format: year_month_day
+      leading_zeros: true
+
+  - name: Year
+    display_name: Order Year
+    expr: DATE_TRUNC('year', o_orderdate)
+    format: 
+      type: date
+      date_format: year_month_day
+      leading_zeros: true
+
+  - name: Month
+    display_name: Order Month
+    expr: DATE_TRUNC('month', o_orderdate)
+    format: 
+      type: date
+      date_format: year_month_day
+      leading_zeros: true
+
+  - name: Quarter
+    display_name: Order Quarter
+    expr: DATE_TRUNC('quarter', o_orderdate)
+    format: 
+      type: date
+      date_format: year_month_day
+      leading_zeros: true
+
+  - name: Week
+    display_name: Order Week
+    expr: DATE_TRUNC('week', o_orderdate)
+    format: 
+      type: date
+      date_format: year_month_day
+      leading_zeros: true
+
+  - name: OrderPriority
+    display_name: Order Priority
+    expr: o_orderpriority
+
+  - name: ShipPriority
+    display_name: Ship Priority
+    expr: o_shippriority
+
+measures:
+  - name: TotalPrice
+    display_name: Total Price
+    comment: Total order price (base measure without window)
+    expr: SUM(o_totalprice)
+    format:
+      type: currency
+      currency_code: USD
+      decimal_places:
+        type: exact
+        places: 2
+      hide_group_separator: false
+      abbreviation: none
+
+  - name: TotalPrice_CM
+    display_name: Total Price CM
+    comment: Total order price for the current month
+    expr: SUM(o_totalprice)
+    window:
+      - order: Month
+        range: current
+        semiadditive: last
+    format:
+      type: currency
+      currency_code: USD
+      decimal_places:
+        type: exact
+        places: 2
+      hide_group_separator: false
+      abbreviation: none
+
+  - name: TotalPrice_PM
+    display_name: Total Price PM
+    comment: Total order price for the previous month
+    expr: SUM(o_totalprice)
+    window:
+      - order: Month
+        range: current
+        semiadditive: last
+        offset: -1 month
+    format:
+      type: currency
+      currency_code: USD
+      decimal_places:
+        type: exact
+        places: 2
+      hide_group_separator: false
+      abbreviation: none
+
+  - name: TotalPrice_MoM
+    display_name: Total Price MoM
+    comment: Month-over-month growth rate
+    expr: (AGG(TotalPrice_CM) - AGG(TotalPrice_PM)) / AGG(TotalPrice_PM)
+    format:
+      type: percentage
+      decimal_places:
+        type: exact
+        places: 2
+
+  - name: TotalPrice_CQ
+    display_name: Total Price CQ
+    comment: Total order price for the current quarter
+    expr: SUM(o_totalprice)
+    window:
+      - order: Quarter
+        range: current
+        semiadditive: last
+    format:
+      type: currency
+      currency_code: USD
+      decimal_places:
+        type: exact
+        places: 2
+      hide_group_separator: false
+      abbreviation: none
+
+  - name: TotalPrice_PQ
+    display_name: Total Price PQ
+    comment: Total order price for the previous quarter
+    expr: SUM(o_totalprice)
+    window:
+      - order: Quarter
+        range: current
+        semiadditive: last
+        offset: -3 months
+    format:
+      type: currency
+      currency_code: USD
+      decimal_places:
+        type: exact
+        places: 2
+      hide_group_separator: false
+      abbreviation: none
+
+  - name: TotalPrice_QoQ
+    display_name: Total Price QoQ
+    comment: Quarter-over-quarter growth rate
+    expr: (AGG(TotalPrice_CQ) - AGG(TotalPrice_PQ)) / AGG(TotalPrice_PQ)
+    format:
+      type: percentage
+      decimal_places:
+        type: exact
+        places: 2
+
+  - name: TotalPrice_CY
+    display_name: Total Price CY
+    comment: Total order price for the current year
+    expr: SUM(o_totalprice)
+    window:
+      - order: Year
+        range: current
+        semiadditive: last
+    format:
+      type: currency
+      currency_code: USD
+      decimal_places:
+        type: exact
+        places: 2
+      hide_group_separator: false
+      abbreviation: none
+
+  - name: TotalPrice_PY
+    display_name: Total Price PY
+    comment: Total order price for the previous year
+    expr: SUM(o_totalprice)
+    window:
+      - order: Year
+        range: current
+        semiadditive: last
+        offset: -1 year
+    format:
+      type: currency
+      currency_code: USD
+      decimal_places:
+        type: exact
+        places: 2
+      hide_group_separator: false
+      abbreviation: none
+
+  - name: TotalPrice_YoY
+    display_name: Total Price YoY
+    comment: Year-over-year growth rate
+    expr: (AGG(TotalPrice_CY) - AGG(TotalPrice_PY)) / AGG(TotalPrice_PY)
+    format:
+      type: percentage
+      decimal_places:
+        type: exact
+        places: 2
+
+  - name: TotalPrice_CW
+    display_name: Total Price CW
+    comment: Total order price for the current week (Mon-Sun)
+    expr: SUM(o_totalprice)
+    window:
+      - order: Week
+        range: current
+        semiadditive: last
+    format:
+      type: currency
+      currency_code: USD
+      decimal_places:
+        type: exact
+        places: 2
+      hide_group_separator: false
+      abbreviation: none
+
+  - name: TotalPrice_PW
+    display_name: Total Price PW
+    comment: Total order price for the previous week (Mon-Sun)
+    expr: SUM(o_totalprice)
+    window:
+      - order: Week
+        range: current
+        semiadditive: last
+        offset: -7 days
+    format:
+      type: currency
+      currency_code: USD
+      decimal_places:
+        type: exact
+        places: 2
+      hide_group_separator: false
+      abbreviation: none
+
+  - name: TotalPrice_WoW
+    display_name: Total Price WoW
+    comment: Week-over-week growth rate (fixed Mon-Sun intervals)
+    expr: (AGG(TotalPrice_CW) - AGG(TotalPrice_PW)) / AGG(TotalPrice_PW)
+    format:
+      type: percentage
+      decimal_places:
+        type: exact
+        places: 2

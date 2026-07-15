@@ -1,4 +1,4 @@
-## DB license
+# DB license
 
 **Definitions**.
 

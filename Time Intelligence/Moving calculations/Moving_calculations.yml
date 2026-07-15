@@ -1,0 +1,287 @@
+version: 1.1
+comment: Unity Catalog semantics patterns
+
+source: orders
+
+joins:
+  - name: customer
+    source: customer
+    'on': source.o_custkey = customer.c_custkey
+    rely:
+      at_most_one_match: true
+    joins:
+      - name: nation
+        source: nation
+        'on': customer.c_nationkey = nation.n_nationkey
+        rely:
+          at_most_one_match: true
+        joins:
+          - name: region
+            source: region
+            'on': nation.n_regionkey = region.r_regionkey
+            rely:
+              at_most_one_match: true
+
+fields:
+  - name: RegionName
+    display_name: Region Name
+    expr: customer.nation.region.r_name
+
+  - name: CountryName
+    display_name: Country Name
+    expr: customer.nation.n_name
+
+  - name: CustomerName
+    display_name: Customer Name
+    expr: customer.c_name
+
+  - name: MarketSegment
+    display_name: Market Segment
+    expr: customer.c_mktsegment
+
+  - name: OrderDate
+    display_name: Order Date
+    expr: o_orderdate
+    format: 
+      type: date
+      date_format: year_month_day
+      leading_zeros: true
+
+  - name: Year
+    display_name: Order Year
+    expr: "DATE_TRUNC('year', o_orderdate)"
+    format: 
+      type: date
+      date_format: year_month_day
+      leading_zeros: true
+
+  - name: Month
+    display_name: Order Month
+    expr: "DATE_TRUNC('month', o_orderdate)"
+    format: 
+      type: date
+      date_format: year_month_day
+      leading_zeros: true
+
+  - name: Quarter
+    display_name: Order Quarter
+    expr: "DATE_TRUNC('quarter', o_orderdate)"
+    format: 
+      type: date
+      date_format: year_month_day
+      leading_zeros: true
+
+  - name: OrderPriority
+    display_name: Order Priority
+    expr: o_orderpriority
+
+  - name: ShipPriority
+    display_name: Ship Priority
+    expr: o_shippriority
+
+measures:
+  - name: TotalPrice
+    display_name: Total Price
+    comment: Sum of o_totalprice across all orders in the period
+    expr: SUM(o_totalprice)
+    format:
+      type: currency
+      currency_code: USD
+      decimal_places:
+        type: exact
+        places: 2
+      hide_group_separator: false
+      abbreviation: none
+
+  - name: TotalPrice7DayMovingSum
+    display_name: Total Price Weekly Total
+    comment: Rolling sum of TotalPrice over the trailing 7 days, inclusive of the current day
+    expr: AGG(TotalPrice)
+    window:
+      - order: OrderDate
+        semiadditive: last
+        range: trailing 7 day inclusive
+    format:
+      type: currency
+      currency_code: USD
+      decimal_places:
+        type: exact
+        places: 2
+      hide_group_separator: false
+      abbreviation: none
+
+  - name: TotalPrice7DayMovingAvg
+    display_name: Total Price Weekly Moving Average
+    comment: Average daily TotalPrice over the trailing 7 days, inclusive of the current day (rolling sum ÷ 7)
+    expr: AGG(TotalPrice)/7
+    window:
+      - order: OrderDate
+        semiadditive: last
+        range: trailing 7 day inclusive
+    format:
+      type: currency
+      currency_code: USD
+      decimal_places:
+        type: exact
+        places: 2
+      hide_group_separator: false
+      abbreviation: none
+
+  - name: TotalPrice7DayPrevMovingAvg
+    display_name: Total Price Previous Weekly Moving Average
+    comment: Average daily TotalPrice over the trailing 7 days, excluding the current day (rolling sum ÷ 7)
+    expr: AGG(TotalPrice)/7
+    window:
+      - order: OrderDate
+        semiadditive: last
+        range: trailing 7 day exclusive
+    format:
+      type: currency
+      currency_code: USD
+      decimal_places:
+        type: exact
+        places: 2
+      hide_group_separator: false
+      abbreviation: none
+
+  - name: TotalPrice1MonthMovingSum
+    display_name: Total Price Monthly Total
+    comment: Rolling sum of TotalPrice over the trailing 1-month window, inclusive of the current day
+    expr: AGG(TotalPrice)
+    window:
+      - order: OrderDate
+        semiadditive: last
+        range: trailing 1 month inclusive
+    format:
+      type: currency
+      currency_code: USD
+      decimal_places:
+        type: exact
+        places: 2
+      hide_group_separator: false
+      abbreviation: none
+
+  - name: OrderDayCount1Month
+    display_name: Order Day Count Monthly
+    comment: Number of distinct dates with orders in the trailing 1-month window
+    expr: COUNT(DISTINCT o_orderdate)
+    window:
+      - order: OrderDate
+        semiadditive: last
+        range: trailing 1 month inclusive
+
+  - name: TotalPrice1MonthMovingAvg
+    display_name: Total Price Monthly Moving Average
+    comment: Average daily TotalPrice over the trailing 1-month window, divided by the actual number of distinct dates with orders in the period
+    expr: AGG(TotalPrice1MonthMovingSum) / AGG(OrderDayCount1Month)
+    format:
+      type: currency
+      currency_code: USD
+      decimal_places:
+        type: exact
+        places: 2
+      hide_group_separator: false
+      abbreviation: none
+
+  - name: TotalPrice1QuarterMovingSum
+    display_name: Total Price Quarterly Total
+    comment: Rolling sum of TotalPrice over the trailing 3-month (1-quarter) window, inclusive of the current day
+    expr: AGG(TotalPrice)
+    window:
+      - order: OrderDate
+        semiadditive: last
+        range: trailing 3 month inclusive
+    format:
+      type: currency
+      currency_code: USD
+      decimal_places:
+        type: exact
+        places: 2
+      hide_group_separator: false
+      abbreviation: none
+
+  - name: TotalPrice1QuarterMovingAvg
+    display_name: Total Price Quarterly Moving Average
+    comment: Average monthly TotalPrice over a trailing 3-month (1-quarter) window, using a fixed divisor of 3 months
+    expr: AGG(TotalPrice)/3
+    window:
+      - order: OrderDate
+        semiadditive: last
+        range: trailing 3 month inclusive
+    format:
+      type: currency
+      currency_code: USD
+      decimal_places:
+        type: exact
+        places: 2
+      hide_group_separator: false
+      abbreviation: none
+
+  - name: TotalPrice1YearMovingSum
+    display_name: Total Price Annual Total
+    comment: Rolling sum of TotalPrice over the trailing 1-year window, inclusive of the current day
+    expr: AGG(TotalPrice)
+    window:
+      - order: OrderDate
+        semiadditive: last
+        range: trailing 1 year inclusive
+    format:
+      type: currency
+      currency_code: USD
+      decimal_places:
+        type: exact
+        places: 2
+      hide_group_separator: false
+      abbreviation: none
+
+  - name: OrderDayCount1Year
+    display_name: Order Day Count Annual
+    comment: Number of distinct dates with orders in the trailing 1-year window
+    expr: COUNT(DISTINCT o_orderdate)
+    window:
+      - order: OrderDate
+        semiadditive: last
+        range: trailing 1 year inclusive
+
+  - name: TotalPrice1YearMovingAvg
+    display_name: Total Price Annual Moving Average
+    comment: Average daily TotalPrice over the trailing 1-year window, divided by the actual number of distinct dates with orders in the period
+    expr: AGG(TotalPrice1YearMovingSum) / AGG(OrderDayCount1Year)
+    format:
+      type: currency
+      currency_code: USD
+      decimal_places:
+        type: exact
+        places: 2
+      hide_group_separator: false
+      abbreviation: none
+
+  - name: TotalPrice1YearMovingSumByMonths
+    display_name: Total Price 1-Year Moving Sum
+    comment: Rolling sum of TotalPrice over the trailing 12-month window, inclusive of the current month
+    expr: AGG(TotalPrice)
+    window:
+      - order: Month
+        semiadditive: last
+        range: trailing 12 month inclusive
+    format:
+      type: currency
+      currency_code: USD
+      decimal_places:
+        type: exact
+        places: 2
+      hide_group_separator: false
+      abbreviation: none
+
+  - name: TotalPrice1YearMovingAvgByMonths
+    display_name: Total Price 1-Year Moving Average
+    comment: Average monthly TotalPrice over the trailing 12-month window, divided by 12
+    expr: AGG(TotalPrice1YearMovingSumByMonths) / 12
+    format:
+      type: currency
+      currency_code: USD
+      decimal_places:
+        type: exact
+        places: 2
+      hide_group_separator: false
+      abbreviation: none

@@ -1,0 +1,145 @@
+version: 1.1
+comment: Unity Catalog semantics patterns
+
+source: inventory_daily
+
+joins:
+  - name: date_dim
+    source: date_dim
+    'on': source.inv_date_sk = date_dim.d_date_sk
+    rely:
+      at_most_one_match: true
+  - name: item
+    source: item
+    'on': source.inv_item_sk = item.i_item_sk
+    rely:
+      at_most_one_match: true
+  - name: warehouse
+    source: warehouse
+    'on': source.inv_warehouse_sk = warehouse.w_warehouse_sk
+    rely:
+      at_most_one_match: true
+
+fields:
+  - name: WarehouseName
+    display_name: Warehouse Name
+    expr: warehouse.w_warehouse_name
+
+  - name: WarehouseID
+    display_name: Warehouse ID
+    expr: warehouse.w_warehouse_id
+
+  - name: ProductName
+    display_name: Product Name
+    expr: item.i_product_name
+
+  - name: Date
+    display_name: Date
+    expr: date_dim.d_date
+
+  - name: Year
+    display_name: Year
+    expr: DATE_TRUNC('year', date_dim.d_date)
+    format: 
+      type: date
+      date_format: year_month_day
+      leading_zeros: true
+
+  - name: Quarter
+    display_name: Quarter
+    expr: DATE_TRUNC('quarter', date_dim.d_date)
+    format: 
+      type: date
+      date_format: year_month_day
+      leading_zeros: true
+
+  - name: Month
+    display_name: Month
+    expr: DATE_TRUNC('month', date_dim.d_date)
+    format: 
+      type: date
+      date_format: year_month_day
+      leading_zeros: true
+
+measures:
+  - name: _Quantity
+    expr: SUM(inv_quantity_on_hand)
+  
+  - name: _QuantityPrevDay
+    expr: SUM(inv_quantity_on_hand_prev_day)
+
+  - name: BalanceFirstDate
+    display_name: Balance - First Date
+    comment: The balance as of the first date in the current period
+    expr: _Quantity
+    window:
+      - order: Date
+        range: current
+        semiadditive: first
+    format: 
+      type: number
+      decimal_places:
+        type: exact
+        places: 0
+      hide_group_separator: false
+      abbreviation: none
+
+  - name: BalanceLastDate
+    display_name: Balance - Last Date
+    comment: The balance as of the last date in the current period
+    expr: _Quantity
+    window:
+      - order: Date
+        range: current
+        semiadditive: last
+    format: 
+      type: number
+      decimal_places:
+        type: exact
+        places: 0
+      hide_group_separator: false
+      abbreviation: none
+
+  - name: OpeningBalance
+    display_name: Opening Balance
+    comment: The balance as of the beginning of the current period (the same as of the last date in the preceding period)
+    expr: _QuantityPrevDay
+    window:
+      - order: Date
+        range: current
+        semiadditive: first
+    format: 
+      type: number
+      decimal_places:
+        type: exact
+        places: 0
+      hide_group_separator: false
+      abbreviation: none
+
+  - name: ClosingBalance
+    display_name: Closing Balance
+    comment: The balance as of the end of the current period (the same as of the last date in the current period)
+    expr: _Quantity
+    window:
+      - order: Date
+        range: current
+        semiadditive: last
+    format: 
+      type: number
+      decimal_places:
+        type: exact
+        places: 0
+      hide_group_separator: false
+      abbreviation: none
+
+  - name: GrowthInPeriod
+    display_name: Growth in period
+    comment: The balance growth in the current period - the delta between opening and closing balances
+    expr: COALESCE(AGG(ClosingBalance),0)-COALESCE(AGG(OpeningBalance),0)
+    format:
+      type: number
+      decimal_places:
+        type: exact
+        places: 0
+      hide_group_separator: false
+      abbreviation: none
