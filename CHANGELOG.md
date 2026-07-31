@@ -2,19 +2,11 @@
 
 All notable changes to this project are documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
 
+## [1.1.0] - 2026-08-01
 ### Added
-- ...
-
-### Changed
-- ...
-
-### Fixed
-- ...
-
-### Removed
-- ...
+- **Dynamic ranking** patterns - Basic ranking (`RANK`), Dense ranking (`DENSE_RANK`), Row number (`ROW_NUMBER`), Buckets (`NTILE`), Percentile standing (`PERCENT_RANK`), Cumulative distribution (`CUME_DIST`) — each as Global and Year (`PARTITION BY Year`) variants, with an end-to-end YAML template.
+- **Static ranking** - using precomputed values, so ranks stay fixed across regrouping (works with all ranking functions).
 
 
 ## [1.0.0] - 2026-07-15

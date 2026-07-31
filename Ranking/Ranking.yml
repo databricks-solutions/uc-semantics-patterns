@@ -1,0 +1,270 @@
+version: 1.1
+comment: Unity Catalog semantics patterns
+
+source: orders
+
+joins:
+  - name: customer
+    source: customer
+    'on': source.o_custkey = customer.c_custkey
+    rely:
+      at_most_one_match: true
+    joins:
+      - name: nation
+        source: nation
+        'on': customer.c_nationkey = nation.n_nationkey
+        rely:
+          at_most_one_match: true
+        joins:
+          - name: region
+            source: region
+            'on': nation.n_regionkey = region.r_regionkey
+            rely:
+              at_most_one_match: true
+
+fields:
+  - name: RegionName
+    display_name: Region Name
+    expr: customer.nation.region.r_name
+
+  - name: CountryName
+    display_name: Country Name
+    expr: customer.nation.n_name
+
+  - name: CustomerName
+    display_name: Customer Name
+    expr: customer.c_name
+
+  - name: MarketSegment
+    display_name: Market Segment
+    expr: customer.c_mktsegment
+
+  - name: OrderDate
+    display_name: Order Date
+    expr: o_orderdate
+    format:
+      type: date
+      date_format: year_month_day
+      leading_zeros: true
+
+  - name: Year
+    display_name: Order Year
+    expr: DATE_TRUNC('year', o_orderdate)
+    format:
+      type: date
+      date_format: year_month_day
+      leading_zeros: true
+
+  - name: Month
+    display_name: Order Month
+    expr: DATE_TRUNC('month', o_orderdate)
+    format:
+      type: date
+      date_format: year_month_day
+      leading_zeros: true
+
+  - name: Quarter
+    display_name: Order Quarter
+    expr: DATE_TRUNC('quarter', o_orderdate)
+    format:
+      type: date
+      date_format: year_month_day
+      leading_zeros: true
+
+  - name: OrderPriority
+    display_name: Order Priority
+    expr: o_orderpriority
+
+  - name: ShipPriority
+    display_name: Ship Priority
+    expr: o_shippriority
+
+
+  - name: OrderCount_dim
+    display_name: Order Count dim
+    expr: COUNT(o_orderkey) OVER (PARTITION BY `Year`)
+
+
+measures:
+  # ==================================================================
+  # Base measure
+  # ==================================================================
+
+  - name: OrderCount
+    display_name: Order Count
+    comment: Count of orders
+    expr: COUNT(o_orderkey)
+    format:
+      type: number
+      decimal_places:
+        type: all
+      hide_group_separator: false
+      abbreviation: none
+
+
+  # ==================================================================
+  # Basic Ranking — leaderboard position, gaps after ties
+  # ==================================================================
+  - name: DynamicRankOrderCount
+    display_name: Dynamic Rank by Orders
+    expr: RANK() OVER (ORDER BY COUNT(o_orderkey) DESC)
+    format:
+      type: number
+      decimal_places:
+        type: all
+      hide_group_separator: false
+      abbreviation: none
+
+  - name: YearRankOrderCount
+    display_name: Dynamic Rank by Orders - Year
+    expr: RANK() OVER (PARTITION BY `Year` ORDER BY COUNT(o_orderkey) DESC)
+    format:
+      type: number
+      decimal_places:
+        type: all
+      hide_group_separator: false
+      abbreviation: none
+
+
+  # ==================================================================
+  # Dense Ranking — buying tiers, no gaps after ties
+  # ==================================================================
+
+  - name: DynamicDenseRankOrderCount
+    display_name: Dynamic Dense Rank by Orders
+    expr: DENSE_RANK() OVER (ORDER BY COUNT(o_orderkey) DESC)
+    format:
+      type: number
+      decimal_places:
+        type: all
+      hide_group_separator: false
+      abbreviation: none
+
+  - name: YearDenseRankOrderCount
+    display_name: Dynamic Dense Rank by Orders - Year
+    expr: DENSE_RANK() OVER (PARTITION BY `Year` ORDER BY COUNT(o_orderkey) DESC)
+    format:
+      type: number
+      decimal_places:
+        type: all
+      hide_group_separator: false
+      abbreviation: none
+
+
+  # ==================================================================
+  # Row Number — one name per position (#1, #2, #3)
+  # ==================================================================
+
+  - name: DynamicRowNumberOrderCount
+    display_name: Dynamic Row Number by Orders
+    expr: ROW_NUMBER() OVER (ORDER BY COUNT(o_orderkey) DESC)
+    format:
+      type: number
+      decimal_places:
+        type: all
+      hide_group_separator: false
+      abbreviation: none
+
+  - name: YearRowNumberOrderCount
+    display_name: Dynamic Row Number by Orders - Year
+    expr: ROW_NUMBER() OVER (PARTITION BY `Year` ORDER BY COUNT(o_orderkey) DESC)
+    format:
+      type: number
+      decimal_places:
+        type: all
+      hide_group_separator: false
+      abbreviation: none
+
+
+  # ==================================================================
+  # Buckets — split accounts into top/bottom halves or quartiles
+  # ==================================================================
+
+  - name: DynamicNTile2OrderCount
+    display_name: Dynamic NTile(2) by Orders
+    expr: NTILE(2) OVER (ORDER BY COUNT(o_orderkey) DESC)
+    format:
+      type: number
+      decimal_places:
+        type: all
+      hide_group_separator: false
+      abbreviation: none
+
+  - name: YearNTile2OrderCount
+    display_name: Dynamic NTile(2) by Orders - Year
+    expr: NTILE(2) OVER (PARTITION BY `Year` ORDER BY COUNT(o_orderkey) DESC)
+    format:
+      type: number
+      decimal_places:
+        type: all
+      hide_group_separator: false
+      abbreviation: none
+
+
+  # ==================================================================
+  # Percentile Standing — relative standing within the pack
+  # ==================================================================
+
+  - name: DynamicPercentRankOrderCount
+    display_name: Dynamic Percent Rank by Orders
+    expr: PERCENT_RANK() OVER (ORDER BY COUNT(o_orderkey) DESC)
+    format:
+      type: number
+      decimal_places:
+        type: exact
+        places: 2
+      hide_group_separator: false
+      abbreviation: none
+
+  - name: YearPercentRankOrderCount
+    display_name: Dynamic Percent Rank by Orders - Year
+    expr: PERCENT_RANK() OVER (PARTITION BY `Year` ORDER BY COUNT(o_orderkey) DESC)
+    format:
+      type: number
+      decimal_places:
+        type: exact
+        places: 2
+      hide_group_separator: false
+      abbreviation: none
+
+
+  # ==================================================================
+  # Cumulative Distribution — what share of customers rank at or below
+  # ==================================================================
+
+  - name: DynamicCumeDistOrderCount
+    display_name: Dynamic Cumulative Distribution by Orders
+    expr: CUME_DIST() OVER (ORDER BY COUNT(o_orderkey) DESC)
+    format:
+      type: number
+      decimal_places:
+        type: exact
+        places: 2
+      hide_group_separator: false
+      abbreviation: none
+
+  - name: YearCumeDistOrderCount
+    display_name: Dynamic Cumulative Distribution by Orders - Year
+    expr: CUME_DIST() OVER (PARTITION BY `Year` ORDER BY COUNT(o_orderkey) DESC)
+    format:
+      type: number
+      decimal_places:
+        type: exact
+        places: 2
+      hide_group_separator: false
+      abbreviation: none
+
+
+  # ==================================================================
+  # Static Ranking — a fixed rank that ignores regrouping
+  # ==================================================================
+
+  - name: StaticRankOrderCount
+    display_name: Static Rank by Orders
+    expr: RANK() OVER (ORDER BY `OrderCount_dim` DESC)
+    format:
+      type: number
+      decimal_places:
+        type: all
+      hide_group_separator: false
+      abbreviation: none
