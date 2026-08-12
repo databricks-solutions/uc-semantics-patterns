@@ -23,6 +23,7 @@ Whether you're building a governed semantic layer from scratch or extending an e
 | 01 | [Time Intelligence](./Time%20Intelligence/)                   | Period-over-period growth (YoY, QoQ, MoM, WoW), period-to-date totals (YTD, QTD, MTD), period-to-date growth, and moving/rolling calculations   |
 | 02 | [Semi-additive calculations](./Semi-additive%20calculations/) | Opening and closing balances, first/last date values, and growth-in-period for non-additive measures like inventory and account balances       |
 | 03 | [Ranking](./Ranking/)                                         | Dynamic and static ranking of entities by a measure, including global and year-partitioned variants |
+| 04 | [Currency conversion](./Currency%20conversion/)               | Convert amounts into a user-selected reporting currency via query-time parameters, using historical FX rates         |
 
 
 ## :question: How to get help

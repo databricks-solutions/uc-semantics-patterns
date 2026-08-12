@@ -3,6 +3,11 @@
 All notable changes to this project are documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.2.0] - 2026-08-07
+### Added
+- **Currency conversion** pattern: convert amounts into a user-selected reporting currency using query-time parameters — single source / multiple targets, multiple sources / multiple targets, and multiple exchange-rate types (AVG/EOP).
+
+
 ## [1.1.0] - 2026-08-01
 ### Added
 - **Dynamic ranking** patterns - Basic ranking (`RANK`), Dense ranking (`DENSE_RANK`), Row number (`ROW_NUMBER`), Buckets (`NTILE`), Percentile standing (`PERCENT_RANK`), Cumulative distribution (`CUME_DIST`) — each as Global and Year (`PARTITION BY Year`) variants, with an end-to-end YAML template.

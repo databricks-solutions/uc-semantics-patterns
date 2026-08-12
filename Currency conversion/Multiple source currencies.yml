@@ -1,0 +1,67 @@
+version: 1.1
+comment: Unity Catalog semantics patterns - Currency conversion
+
+# Each order's source currency is pre-assigned in the orders_currency table (see currency-conversion.sql),
+# so this view reads the source_currency column directly - no inline SQL or joins needed.
+source: orders_currency
+
+parameters:
+  - name: p_target_currency
+    display_name: Target Currency
+    comment: Reporting currency to convert into (USD, EUR, GBP, JPY, ZAR, SAR)
+    data_type: STRING
+    default: "'USD'"
+
+joins:
+  - name: fx
+    source: exchange_rate
+    'on': |-
+      fx.rate_month = DATE_TRUNC('month', source.o_orderdate)
+      AND fx.from_currency = source.source_currency
+      AND fx.to_currency = p_target_currency
+      AND fx.rate_type = 'AVG'
+    rely:
+      at_most_one_match: true
+
+fields:
+  - name: Month
+    display_name: Order Month
+    expr: DATE_TRUNC('month', o_orderdate)
+    format:
+      type: date
+      date_format: year_month_day
+      leading_zeros: true
+
+  - name: SourceCurrency
+    display_name: Source Currency
+    comment: Currency each order is denominated in (from orders_currency)
+    expr: source_currency
+
+  - name: TargetCurrency
+    display_name: Target Currency
+    expr: fx.to_currency
+
+measures:
+  - name: TotalPriceSource
+    display_name: Total Price (mixed source currencies)
+    comment: Sum in source currency; not comparable across currencies
+    expr: SUM(o_totalprice)
+    format:
+      type: number
+      decimal_places:
+        type: exact
+        places: 2
+      hide_group_separator: false
+      abbreviation: none
+
+  - name: TotalPriceConverted
+    display_name: Total Price (converted)
+    comment: Converted to p_target_currency at the AVG monthly rate, summed
+    expr: SUM(o_totalprice * fx.rate)
+    format:
+      type: number
+      decimal_places:
+        type: exact
+        places: 2
+      hide_group_separator: false
+      abbreviation: none

@@ -1,0 +1,81 @@
+version: 1.1
+comment: Unity Catalog semantics patterns - Currency conversion
+
+# As in the multi-source case, each order's source currency is pre-assigned in the orders_currency table
+# (see currency-conversion.sql), so this view reads the source_currency column directly.
+source: orders_currency
+
+parameters:
+  - name: p_target_currency
+    display_name: Target Currency
+    comment: Reporting currency to convert into (USD, EUR, GBP, JPY, ZAR, SAR)
+    data_type: STRING
+    default: "'USD'"
+
+  # NOTE: this parameter is deliberately named p_rate_type, NOT rate_type. A bare `rate_type` in the join 'on'
+  # clause would be ambiguous with the exchange_rate.rate_type column and silently resolve to the column, so the
+  # predicate `fx.rate_type = rate_type` would become `fx.rate_type = fx.rate_type` (always true) and both rate
+  # types would match - doubling the join fanout. A distinct parameter name avoids the collision.
+  - name: p_rate_type
+    display_name: Exchange Rate Type
+    comment: Rate series - AVG (period average) or EOP (end of period)
+    data_type: STRING
+    default: "'AVG'"
+
+joins:
+  - name: fx
+    source: exchange_rate
+    'on': |-
+      fx.rate_month = DATE_TRUNC('month', source.o_orderdate)
+      AND fx.from_currency = source.source_currency
+      AND fx.to_currency = p_target_currency
+      AND fx.rate_type = p_rate_type
+    rely:
+      at_most_one_match: true
+
+fields:
+  - name: Month
+    display_name: Order Month
+    expr: DATE_TRUNC('month', o_orderdate)
+    format:
+      type: date
+      date_format: year_month_day
+      leading_zeros: true
+
+  - name: SourceCurrency
+    display_name: Source Currency
+    comment: Currency each order is denominated in (from orders_currency)
+    expr: source_currency
+
+  - name: TargetCurrency
+    display_name: Target Currency
+    expr: fx.to_currency
+
+  - name: RateType
+    display_name: Exchange Rate Type
+    expr: fx.rate_type
+
+measures:
+  - name: TotalPriceSource
+    display_name: Total Price (mixed source currencies)
+    comment: Sum in source currency; not comparable across currencies
+    expr: SUM(o_totalprice)
+    format:
+      type: number
+      decimal_places:
+        type: exact
+        places: 2
+      hide_group_separator: false
+      abbreviation: none
+
+  - name: TotalPriceConverted
+    display_name: Total Price (converted)
+    comment: Converted to p_target_currency at the selected rate type, summed
+    expr: SUM(o_totalprice * fx.rate)
+    format:
+      type: number
+      decimal_places:
+        type: exact
+        places: 2
+      hide_group_separator: false
+      abbreviation: none
