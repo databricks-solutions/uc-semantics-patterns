@@ -1,0 +1,113 @@
+version: 1.1
+comment: Unity Catalog semantics patterns
+
+source: orders
+
+joins:
+  - name: customer
+    source: customer
+    'on': source.o_custkey = customer.c_custkey
+    rely:
+      at_most_one_match: true
+    joins:
+      - name: nation
+        source: nation
+        'on': customer.c_nationkey = nation.n_nationkey
+        rely:
+          at_most_one_match: true
+        joins:
+          - name: region
+            source: region
+            'on': nation.n_regionkey = region.r_regionkey
+            rely:
+              at_most_one_match: true
+
+fields:
+  - name: RegionName
+    display_name: Region Name
+    expr: customer.nation.region.r_name
+
+  - name: CountryName
+    display_name: Country Name
+    expr: customer.nation.n_name
+
+  - name: CustomerName
+    display_name: Customer Name
+    expr: customer.c_name
+
+measures:
+  - name: Revenue
+    display_name: Revenue
+    comment: Total order revenue (leaf-level additive measure)
+    expr: SUM(o_totalprice)
+    format:
+      type: number
+      decimal_places:
+        type: exact
+        places: 0
+      hide_group_separator: false
+      abbreviation: none
+
+  # --- Parent subtotals: roll the leaf measure up to an ancestor level and show it on
+  #     every child row, so a drill-down carries its parent's total alongside it. ---
+  - name: RevenueRegionSubtotal
+    display_name: Revenue — Region Subtotal
+    comment: Region-level rollup of Revenue, repeated on every descendant row
+    expr: SUM(SUM(o_totalprice)) OVER (PARTITION BY `RegionName`)
+    format:
+      type: number
+      decimal_places:
+        type: exact
+        places: 0
+      hide_group_separator: false
+      abbreviation: none
+
+  - name: RevenueCountrySubtotal
+    display_name: Revenue — Country Subtotal
+    comment: Country-level rollup of Revenue within its region
+    expr: SUM(SUM(o_totalprice)) OVER (PARTITION BY `RegionName`, `CountryName`)
+    format:
+      type: number
+      decimal_places:
+        type: exact
+        places: 0
+      hide_group_separator: false
+      abbreviation: none
+
+  # --- Share-of-parent (ratio-to-parent): a level's contribution to its immediate
+  #     ancestor and to the grand total. Denominators are the subtotals above. ---
+  - name: PctOfRegion
+    display_name: % of Region
+    comment: This row's Revenue as a share of its Region subtotal
+    expr: SUM(o_totalprice) / NULLIF(SUM(SUM(o_totalprice)) OVER (PARTITION BY `RegionName`), 0)
+    format:
+      type: number
+      decimal_places:
+        type: exact
+        places: 4
+      hide_group_separator: false
+      abbreviation: none
+
+  - name: PctOfCountry
+    display_name: % of Country
+    comment: This row's Revenue as a share of its Country subtotal
+    expr: SUM(o_totalprice) / NULLIF(SUM(SUM(o_totalprice)) OVER (PARTITION BY `RegionName`, `CountryName`), 0)
+    format:
+      type: number
+      decimal_places:
+        type: exact
+        places: 4
+      hide_group_separator: false
+      abbreviation: none
+
+  - name: PctOfTotal
+    display_name: % of Total
+    comment: This row's Revenue as a share of the grand total (all rows)
+    expr: SUM(o_totalprice) / NULLIF(SUM(SUM(o_totalprice)) OVER (), 0)
+    format:
+      type: number
+      decimal_places:
+        type: exact
+        places: 4
+      hide_group_separator: false
+      abbreviation: none
