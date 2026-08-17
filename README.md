@@ -24,7 +24,7 @@ Whether you're building a governed semantic layer from scratch or extending an e
 | 02 | [Semi-additive calculations](./Semi-additive%20calculations/) | Opening and closing balances, first/last date values, and growth-in-period for non-additive measures like inventory and account balances       |
 | 03 | [Ranking](./Ranking/)                                         | Dynamic and static ranking of entities by a measure, including global and year-partitioned variants |
 | 04 | [Currency conversion](./Currency%20conversion/)               | Convert amounts into a user-selected reporting currency via query-time parameters, using historical FX rates         |
-| 05 | [Hierarchies](./Hierarchies/)                                 | Parent-child rollups (ancestor subtotals) and share-of-parent (% of region/country/total) for fixed-depth hierarchies, plus a recursive-CTE flattener for arbitrary-depth self-referential trees |
+| 05 | [Hierarchies](./Hierarchies/)                                 | Parent subtotals (roll a leaf measure up to the parent level) and percentage of parent node (% of parent, % of total) for fixed-depth hierarchies |
 
 
 ## :question: How to get help

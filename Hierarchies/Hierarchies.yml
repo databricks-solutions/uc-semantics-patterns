@@ -48,11 +48,12 @@ measures:
       hide_group_separator: false
       abbreviation: none
 
-  # --- Parent subtotals: roll the leaf measure up to an ancestor level and show it on
-  #     every child row, so a drill-down carries its parent's total alongside it. ---
-  - name: RevenueRegionSubtotal
-    display_name: Revenue — Region Subtotal
-    comment: Region-level rollup of Revenue, repeated on every descendant row
+  # --- Parent subtotal: roll the leaf measure up to the parent (ancestor) level and
+  #     repeat it on every child row, so a drill-down carries its parent's total. At the
+  #     region -> country grain the parent is the region. ---
+  - name: RevenueParentSubtotal
+    display_name: Revenue - Parent Subtotal
+    comment: Parent-level (region) rollup of Revenue, repeated on every child row
     expr: SUM(SUM(o_totalprice)) OVER (PARTITION BY `RegionName`)
     format:
       type: number
@@ -62,52 +63,24 @@ measures:
       hide_group_separator: false
       abbreviation: none
 
-  - name: RevenueCountrySubtotal
-    display_name: Revenue — Country Subtotal
-    comment: Country-level rollup of Revenue within its region
-    expr: SUM(SUM(o_totalprice)) OVER (PARTITION BY `RegionName`, `CountryName`)
-    format:
-      type: number
-      decimal_places:
-        type: exact
-        places: 0
-      hide_group_separator: false
-      abbreviation: none
-
-  # --- Share-of-parent (ratio-to-parent): a level's contribution to its immediate
-  #     ancestor and to the grand total. Denominators are the subtotals above. ---
-  - name: PctOfRegion
-    display_name: % of Region
-    comment: This row's Revenue as a share of its Region subtotal
+  # --- Percentage of parent node: a row's contribution to its parent, and to the grand
+  #     total. Denominators are the windowed subtotals; NULLIF guards an empty partition. ---
+  - name: PctOfParent
+    display_name: "% of Parent"
+    comment: This row's Revenue as a share of its parent (region) subtotal
     expr: SUM(o_totalprice) / NULLIF(SUM(SUM(o_totalprice)) OVER (PARTITION BY `RegionName`), 0)
     format:
-      type: number
+      type: percentage
       decimal_places:
         type: exact
-        places: 4
-      hide_group_separator: false
-      abbreviation: none
-
-  - name: PctOfCountry
-    display_name: % of Country
-    comment: This row's Revenue as a share of its Country subtotal
-    expr: SUM(o_totalprice) / NULLIF(SUM(SUM(o_totalprice)) OVER (PARTITION BY `RegionName`, `CountryName`), 0)
-    format:
-      type: number
-      decimal_places:
-        type: exact
-        places: 4
-      hide_group_separator: false
-      abbreviation: none
+        places: 2
 
   - name: PctOfTotal
-    display_name: % of Total
+    display_name: "% of Total"
     comment: This row's Revenue as a share of the grand total (all rows)
     expr: SUM(o_totalprice) / NULLIF(SUM(SUM(o_totalprice)) OVER (), 0)
     format:
-      type: number
+      type: percentage
       decimal_places:
         type: exact
-        places: 4
-      hide_group_separator: false
-      abbreviation: none
+        places: 2
