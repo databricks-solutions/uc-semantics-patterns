@@ -7,8 +7,6 @@ source: orders_currency
 
 parameters:
   - name: p_target_currency
-    display_name: Target Currency
-    comment: Reporting currency to convert into (USD, EUR, GBP, JPY, ZAR, SAR)
     data_type: STRING
     default: "'USD'"
 

@@ -11,11 +11,11 @@ Unity Catalog semantics solves this with [**parameters**](https://docs.databrick
 
 This pattern covers three scenarios:
 
-| # | Case | Parameters |
-| - | ---- | ---------- |
-| A | [Single source currency, multiple targets](#single-source-currency-multiple-targets) | `p_target_currency` |
-| B | [Multiple source currencies, multiple targets](#multiple-source-currencies-multiple-targets) | `p_target_currency` |
-| C | [Multiple sources, targets and rate types](#multiple-sources-targets-and-rate-types) | `p_target_currency`, `p_rate_type` |
+| # | Case                                                                                         | Parameters                         |
+| - | -------------------------------------------------------------------------------------------- | ---------------------------------- |
+| A | [Single source currency, multiple targets](#single-source-currency-multiple-targets)         | `p_target_currency`                |
+| B | [Multiple source currencies, multiple targets](#multiple-source-currencies-multiple-targets) | `p_target_currency`                |
+| C | [Multiple sources, targets and rate types](#multiple-sources-targets-and-rate-types)         | `p_target_currency`, `p_rate_type` |
 
 ## Preparation
 
@@ -27,13 +27,13 @@ This pattern covers three scenarios:
 
     **`exchange_rate`** table, at grain **(rate_type, from_currency, to_currency, rate_month)**:
 
-    | Column | Meaning |
-    | ------ | ------- |
-    | `rate_type` | `AVG` (period average) or `EOP` (end-of-period / spot) |
-    | `from_currency` | source currency (USD, EUR, GBP, JPY, ZAR, SAR) |
-    | `to_currency` | target currency (USD, EUR, GBP, JPY, ZAR, SAR) |
-    | `rate_month` | first day of the month the rate applies to |
-    | `rate` | units of `to_currency` per **1** unit of `from_currency`, so `converted = amount * rate` |
+    | Column          | Meaning                                                                                  |
+    | --------------- | ---------------------------------------------------------------------------------------- |
+    | `rate_type`     | `AVG` (period average) or `EOP` (end-of-period / spot)                                   |
+    | `from_currency` | source currency (USD, EUR, GBP, JPY, ZAR, SAR)                                           |
+    | `to_currency`   | target currency (USD, EUR, GBP, JPY, ZAR, SAR)                                           |
+    | `rate_month`    | first day of the month the rate applies to                                               |
+    | `rate`          | units of `to_currency` per **1** unit of `from_currency`, so `converted = amount * rate` |
 
     Rates are **real historical data** from the US Federal Reserve H.10 release (via the public [`datasets/exchange-rates`](https://github.com/datasets/exchange-rates) dataset), hardcoded as `VALUES` and covering **1992-01 through 1998-12**, the full TPC-H `orders` date range. The script stores one real *units-per-USD* factor per currency and month (`AVG` from the monthly average, `EOP` from the last daily observation of the month), then derives the `rate` for **every currency pair** by **triangulation** (`rate = to_factor / from_factor`). This keeps the input to real published per-USD rates and guarantees triangular consistency. Identity rows (`from_currency = to_currency`) always have `rate = 1`, and because the factor table spans the full `orders` range, **every order month has a matching rate** (no gaps).
 
@@ -43,13 +43,13 @@ This pattern covers three scenarios:
 
     **`orders_currency`**, the `orders` table (one row per order) enriched with a `source_currency` column mapped from the customer's **TPC-H region** via the standard join path `orders → customer → nation → region`. Each region maps to one currency, with the United Kingdom carved out to GBP:
 
-    | TPC-H region | Currency |
-    | ------------ | -------- |
-    | AMERICA | USD |
-    | EUROPE | EUR *(UNITED KINGDOM → GBP)* |
-    | ASIA | JPY |
-    | AFRICA | ZAR |
-    | MIDDLE EAST | SAR |
+    | TPC-H region | Currency                     |
+    | ------------ | ---------------------------- |
+    | AMERICA      | USD                          |
+    | EUROPE       | EUR *(UNITED KINGDOM → GBP)* |
+    | ASIA         | JPY                          |
+    | AFRICA       | ZAR                          |
+    | MIDDLE EAST  | SAR                          |
 
     Cases B and C read this column instead of deriving the currency inline.
     </details>
@@ -71,8 +71,6 @@ Every order is in USD, so we join to the exchange rate for `from_currency = 'USD
 ```yaml
 parameters:
   - name: p_target_currency
-    display_name: Target Currency
-    comment: Reporting currency the amounts are converted into (USD, EUR, GBP, JPY, ZAR, SAR)
     data_type: STRING
     default: "'EUR'"
 
@@ -197,8 +195,6 @@ parameters:
     data_type: STRING
     default: "'USD'"
   - name: p_rate_type
-    display_name: Exchange Rate Type
-    comment: Which exchange-rate series to use - AVG (period average) or EOP (end of period / spot)
     data_type: STRING
     default: "'AVG'"
 

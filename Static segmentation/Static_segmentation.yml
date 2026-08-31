@@ -1,0 +1,149 @@
+version: 1.1
+comment: Unity Catalog semantics patterns
+
+source: orders
+
+joins:
+  - name: customer
+    source: customer
+    'on': source.o_custkey = customer.c_custkey
+    rely:
+      at_most_one_match: true
+    joins:
+      - name: nation
+        source: nation
+        'on': customer.c_nationkey = nation.n_nationkey
+        rely:
+          at_most_one_match: true
+        joins:
+          - name: region
+            source: region
+            'on': nation.n_regionkey = region.r_regionkey
+            rely:
+              at_most_one_match: true
+
+fields:
+  - name: RegionName
+    display_name: Region Name
+    expr: customer.nation.region.r_name
+
+  - name: CountryName
+    display_name: Country Name
+    expr: customer.nation.n_name
+
+  - name: CustomerName
+    display_name: Customer Name
+    expr: customer.c_name
+
+  - name: MarketSegment
+    display_name: Market Segment
+    expr: customer.c_mktsegment
+
+  - name: OrderDate
+    display_name: Order Date
+    expr: o_orderdate
+    format:
+      type: date
+      date_format: year_month_day
+      leading_zeros: true
+
+  - name: Year
+    display_name: Order Year
+    expr: "DATE_TRUNC('year', o_orderdate)"
+    format:
+      type: date
+      date_format: year_month_day
+      leading_zeros: true
+
+  - name: Month
+    display_name: Order Month
+    expr: "DATE_TRUNC('month', o_orderdate)"
+    format:
+      type: date
+      date_format: year_month_day
+      leading_zeros: true
+
+  - name: Quarter
+    display_name: Order Quarter
+    expr: "DATE_TRUNC('quarter', o_orderdate)"
+    format:
+      type: date
+      date_format: year_month_day
+      leading_zeros: true
+
+  - name: OrderPriority
+    display_name: Order Priority
+    expr: o_orderpriority
+
+  - name: ShipPriority
+    display_name: Ship Priority
+    expr: o_shippriority
+
+  # ===========================================
+  # Segmentation dimensions
+  # ===========================================
+
+  # Global price bands (Min <= value < Max)
+  - name: PriceSegment
+    display_name: Price Segment
+    expr: >
+      CASE
+        WHEN o_totalprice <  50000  THEN 'VERY LOW'
+        WHEN o_totalprice < 150000  THEN 'LOW'
+        WHEN o_totalprice < 300000  THEN 'MEDIUM'
+        ELSE 'HIGH'
+      END
+
+  - name: PriceSegmentSort
+    display_name: Price Segment Sort
+    expr: >
+      CASE
+        WHEN o_totalprice <  50000  THEN 1
+        WHEN o_totalprice < 150000  THEN 2
+        WHEN o_totalprice < 300000  THEN 3
+        ELSE 4
+      END
+
+  # Per-category price bands (thresholds vary by MarketSegment)
+  - name: CategoryPriceSegment
+    display_name: Category Price Segment
+    expr: >
+      CASE customer.c_mktsegment
+        WHEN 'AUTOMOBILE' THEN
+          CASE
+            WHEN o_totalprice < 100000 THEN 'LOW'
+            WHEN o_totalprice < 300000 THEN 'MEDIUM'
+            ELSE 'HIGH'
+          END
+        ELSE
+          CASE
+            WHEN o_totalprice <  50000 THEN 'LOW'
+            WHEN o_totalprice < 150000 THEN 'MEDIUM'
+            ELSE 'HIGH'
+          END
+      END
+
+measures:
+  - name: TotalPrice
+    display_name: Total Price
+    comment: Sum of o_totalprice across all orders in the period
+    expr: SUM(o_totalprice)
+    format:
+      type: currency
+      currency_code: USD
+      decimal_places:
+        type: exact
+        places: 2
+      hide_group_separator: false
+      abbreviation: none
+
+  - name: OrderCount
+    display_name: Order Count
+    comment: Count of orders in the period
+    expr: COUNT(o_orderkey)
+    format:
+      type: number
+      decimal_places:
+        type: all
+      hide_group_separator: false
+      abbreviation: none
