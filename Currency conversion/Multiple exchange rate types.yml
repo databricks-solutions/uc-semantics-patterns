@@ -7,8 +7,6 @@ source: orders_currency
 
 parameters:
   - name: p_target_currency
-    display_name: Target Currency
-    comment: Reporting currency to convert into (USD, EUR, GBP, JPY, ZAR, SAR)
     data_type: STRING
     default: "'USD'"
 
@@ -17,8 +15,6 @@ parameters:
   # predicate `fx.rate_type = rate_type` would become `fx.rate_type = fx.rate_type` (always true) and both rate
   # types would match - doubling the join fanout. A distinct parameter name avoids the collision.
   - name: p_rate_type
-    display_name: Exchange Rate Type
-    comment: Rate series - AVG (period average) or EOP (end of period)
     data_type: STRING
     default: "'AVG'"
 

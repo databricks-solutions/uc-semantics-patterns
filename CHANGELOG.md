@@ -2,10 +2,13 @@
 
 All notable changes to this project are documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-08-31
+### Added
+- **Static segmentation** patterns - Static price-band segmentation (global bands, per-category bands) and bands sourced from an external configuration table
 
 ## [1.2.0] - 2026-08-07
 ### Added
-- **Currency conversion** pattern: convert amounts into a user-selected reporting currency using query-time parameters — single source / multiple targets, multiple sources / multiple targets, and multiple exchange-rate types (AVG/EOP).
+- **Currency conversion** pattern: convert amounts into a user-selected reporting currency using query-time parameters — single source / multiple targets, multiple sources / multiple targets, and multiple exchange-rate types (AVG/EOP). 
 
 
 ## [1.1.0] - 2026-08-01
