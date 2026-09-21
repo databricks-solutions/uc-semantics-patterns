@@ -1,0 +1,232 @@
+version: 1.1
+comment: Unity Catalog semantics patterns
+
+source: orders
+
+joins:
+  - name: customer
+    source: customer
+    'on': source.o_custkey = customer.c_custkey
+    rely:
+      at_most_one_match: true
+    joins:
+      - name: nation
+        source: nation
+        'on': customer.c_nationkey = nation.n_nationkey
+        rely:
+          at_most_one_match: true
+        joins:
+          - name: region
+            source: region
+            'on': nation.n_regionkey = region.r_regionkey
+            rely:
+              at_most_one_match: true
+
+fields:
+  - name: RegionName
+    display_name: Region Name
+    expr: customer.nation.region.r_name
+
+  - name: CountryName
+    display_name: Country Name
+    expr: customer.nation.n_name
+
+  - name: CustomerName
+    display_name: Customer Name
+    expr: customer.c_name
+
+  - name: MarketSegment
+    display_name: Market Segment
+    expr: customer.c_mktsegment
+
+  - name: OrderDate
+    display_name: Order Date
+    expr: o_orderdate
+    format:
+      type: date
+      date_format: year_month_day
+      leading_zeros: true
+
+  - name: Year
+    display_name: Order Year
+    expr: "DATE_TRUNC('year', o_orderdate)"
+    format:
+      type: date
+      date_format: year_month_day
+      leading_zeros: true
+
+  - name: Month
+    display_name: Order Month
+    expr: "DATE_TRUNC('month', o_orderdate)"
+    format:
+      type: date
+      date_format: year_month_day
+      leading_zeros: true
+
+  - name: Quarter
+    display_name: Order Quarter
+    expr: "DATE_TRUNC('quarter', o_orderdate)"
+    format:
+      type: date
+      date_format: year_month_day
+      leading_zeros: true
+
+  - name: OrderPriority
+    display_name: Order Priority
+    expr: o_orderpriority
+
+  - name: ShipPriority
+    display_name: Ship Priority
+    expr: o_shippriority
+
+  # ===========================================
+  # Dynamic Segmentation dimensions
+  # ===========================================
+
+  # Total Sales band based on the year sales
+  - name: CustomerTotal
+    display_name: Customer Total
+    expr: SUM(o_totalprice) OVER (PARTITION BY CustomerName, Year)
+    format:
+      type: currency
+      currency_code: USD
+      decimal_places:
+        type: exact
+        places: 2
+      hide_group_separator: false
+      abbreviation: none
+
+  - name: CustomerSegmentPerYear
+    display_name: Customer Segment Per Year
+    expr: >-
+      CASE
+        WHEN CustomerTotal<50000 THEN 'LOW'
+        WHEN CustomerTotal>=50000 AND CustomerTotal<200000 THEN 'MEDIUM'
+        ELSE 'HIGH'
+      END
+
+  - name: CustomerTotal_PY
+    display_name: Customer Total PY
+    expr: SUM(o_totalprice) OVER (PARTITION BY CustomerName ORDER BY Year RANGE BETWEEN INTERVAL 1 YEAR PRECEDING AND INTERVAL 1 YEAR PRECEDING)
+    format:
+      type: currency
+      currency_code: USD
+      decimal_places:
+        type: exact
+        places: 2
+      hide_group_separator: false
+      abbreviation: none
+
+  - name: CustomerGrowth
+    display_name: Customer Growth
+    expr: >-
+      CASE
+        WHEN CustomerTotal_PY IS NULL THEN 1
+        ELSE (CustomerTotal-CustomerTotal_PY)/CustomerTotal_PY
+      END
+    format:
+      type: percentage
+      decimal_places:
+        type: exact
+        places: 2
+      hide_group_separator: false
+
+  - name: CustomerSegmentPerYearbyGrowth
+    display_name: Customer Segment Per Year by Growth
+    expr: >-
+      CASE
+        WHEN CustomerGrowth<-0.2 THEN 'DROP'
+        WHEN CustomerGrowth>=-0.2 AND CustomerGrowth<0.2 THEN 'STABLE'
+        WHEN (CustomerGrowth>=0.2 AND CustomerGrowth<1)  THEN 'GROW'
+        ELSE 'UNICORN'
+      END
+
+  - name: CustomerSegmentRank
+    display_name: Customer Segment Rank
+    comment: Total Sales band rank based on the year sales
+    expr: >-
+      CASE
+        WHEN CustomerSegmentPerYear = 'HIGH' THEN 3
+        WHEN CustomerSegmentPerYear = 'MEDIUM' THEN 2
+        ELSE 1
+      END
+
+  - name: CustomerMaxRank
+    display_name: Customer Max Rank
+    expr: MAX(CustomerSegmentRank) OVER (PARTITION BY CustomerName)
+
+  - name: CustomerSegment
+    display_name: Customer Segment (Highest)
+    expr: >-
+      CASE
+        WHEN CustomerMaxRank = 3 THEN 'HIGH'
+        WHEN CustomerMaxRank = 2 THEN 'MEDIUM'
+        ELSE 'LOW'
+      END
+
+measures:
+  - name: TotalPrice
+    display_name: Total Price
+    comment: Sum of o_totalprice across all orders in the period
+    expr: SUM(o_totalprice)
+    format:
+      type: currency
+      currency_code: USD
+      decimal_places:
+        type: exact
+        places: 2
+      hide_group_separator: false
+      abbreviation: none
+
+  - name: OrderCount
+    display_name: Order Count
+    comment: Count of orders in the period
+    expr: COUNT(o_orderkey)
+    format:
+      type: number
+      decimal_places:
+        type: all
+      hide_group_separator: false
+      abbreviation: none
+
+  - name: Count_ranges
+    display_name: Customers in segment by year sales
+    comment: Counts the number of distinct customers always including year segment (INCLUDE LOD)
+    expr: count(distinct CustomerName)
+    partition:
+      include: [CustomerSegmentPerYear]
+      outer_aggregate: sum
+    format:
+      type: number
+      decimal_places:
+        type: all
+      hide_group_separator: false
+      abbreviation: none
+
+  - name: Count_highest_ranges
+    display_name: Customers in segment based on the highest range
+    comment: Counts the number of distinct customers by their all-time highest segment (INCLUDE LOD)
+    expr: count(distinct CustomerName)
+    partition:
+      include: [CustomerSegment]
+      outer_aggregate: sum
+    format:
+      type: number
+      decimal_places:
+        type: all
+      hide_group_separator: false
+      abbreviation: none
+
+  - name: Count_ranges_growth
+    display_name: Customers in segment by year growth
+    comment: Counts the number of distinct customers always including year segment based on growth (INCLUDE LOD)
+    expr: count(distinct CustomerName)
+    partition:
+      include: [CustomerSegmentPerYearbyGrowth]
+      outer_aggregate: sum
+    format:
+      type: number
+      decimal_places:
+        type: all
+      hide_group_separator: false
+      abbreviation: none
