@@ -20,7 +20,8 @@ This repository is maintained by Databricks and intended for contributions from 
 │   ├── Period-over-period growth/       # YoY, QoQ, MoM, WoW
 │   ├── Period-to-date growth/           # YOYTD, QOQTD, MOMTD, WOWTD
 │   └── Moving calculations/             # Rolling/trailing window totals and averages
-└── Semi-additive calculations/          # Opening/closing balances, first/last date values
+├── Semi-additive calculations/          # Opening/closing balances, first/last date values
+└── Currency conversion/                 # Query-time currency conversion via parameters, real historical FX rates
 ```
 
 

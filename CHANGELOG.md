@@ -2,6 +2,10 @@
 
 All notable changes to this project are documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-09-21
+### Added
+- **Dynamic segmentation** patterns - Query-time customer segmentation into tiers by yearly sales (LOW/MEDIUM/HIGH), by year-over-year growth trajectory (DROP/STABLE/GROW/UNICORN), and by all-time highest (best-ever) tier — using measure-level `partition` (INCLUDE level-of-detail) counts.
+
 ## [1.3.0] - 2026-08-31
 ### Added
 - **Static segmentation** patterns - Static price-band segmentation (global bands, per-category bands) and bands sourced from an external configuration table
@@ -21,6 +25,6 @@ All notable changes to this project are documented in this file. The format is b
 ### Added
 - Initial release of the project.
 - Curated collection of Unity Catalog semantics patterns.
-- Time Intelligence patterns: period-to-date totals (YTD/QTD/MTD), period-over-period growth (YoY/QoQ/MoM/WoW), period-to-date growth (YOYTD/QOQTD/MOMTD/WOWTD), and moving/rolling calculations.
-- Semi-additive calculations: opening/closing balances, first/last date values, and growth-in-period.
+- **Time Intelligence patterns**: period-to-date totals (YTD/QTD/MTD), period-over-period growth (YoY/QoQ/MoM/WoW), period-to-date growth (YOYTD/QOQTD/MOMTD/WOWTD), and moving/rolling calculations.
+- **Semi-additive calculations**: opening/closing balances, first/last date values, and growth-in-period.
 - End-to-end YAML templates for each pattern and TPC-H / TPC-DS setup scripts.
