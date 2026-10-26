@@ -134,16 +134,16 @@ The pattern classifies entities — here, customers — into segments based on a
 The implementation is based on [Finer level of detail capability](https://docs.databricks.com/aws/en/uc-semantics/metric-views/level-of-detail#finer-level-of-detail). Each pattern below has two parts.
 
 1. **Segment dimensions** (`fields:`) — a windowed measure (e.g. a customer's yearly spend) feeds an expression that assigns the band label (the tier). Because the band is derived from a window, it is recomputed for the current query context.
-2. **A population count** (`measures:`) — an aggregation with a `partition` block.
+2. **A population count** (`measures:`) — an aggregation with a `partition` block. That can be used in the scenarios of the grouping based on the additional dimension with another type of aggregation
 
     ```yaml
     partition:
-      include: [CustomerSegmentPerYear]
-      outer_aggregate: sum
+      include: [Year]
+      outer_aggregate: avg
     ```
 
 > [!NOTE]
-> `partition` is an **INCLUDE level-of-detail**: it forces the distinct count to be evaluated at the segment grain (plus whatever the query groups by, such as `Year`), then combines the per-segment results with `outer_aggregate: sum`. This is what keeps the "how many members are in each tier" count correct as filters change.
+> `partition` is an **INCLUDE level-of-detail**: it forces the measure to be evaluated at the segment grain (plus whatever the query groups by, such as `Year`), then combines the per-segment results with the function defined in `outer_aggregate:`. This is what keeps the "how many members are in each tier" count correct as filters change.
 
 
 ## Tier by yearly sales
@@ -184,9 +184,6 @@ The logic sums the member's sales within the year, turns that total into the tie
   display_name: Customers in segment by year sales
   comment: Counts the number of distinct customers always including year segment (INCLUDE LOD)
   expr: count(distinct CustomerName)
-  partition:
-    include: [CustomerSegmentPerYear]
-    outer_aggregate: sum
   format:
     type: number
     decimal_places:
@@ -219,7 +216,7 @@ The query output shows the number of customers in each segment for each year.
 
 <img width="600" src="./images/CustomerSegmentationPerYear.png" alt="Customers segmented per year by sales" />
 
-</details>
+</details> <br>
 
 
 ## Tier by growth trajectory
@@ -278,8 +275,8 @@ To define growth, the field pulls the prior year's total via a time-based window
   comment: Counts the number of distinct customers always including year segment based on growth (INCLUDE LOD)
   expr: count(distinct CustomerName)
   partition:
-    include: [CustomerSegmentPerYearbyGrowth]
-    outer_aggregate: sum
+    include: [Year]
+    outer_aggregate: avg
   format:
     type: number
     decimal_places:
@@ -293,6 +290,7 @@ To define growth, the field pulls the prior year's total via a time-based window
 ```sql
 SELECT
     CustomerSegmentPerYearbyGrowth,
+    AGG(Count_ranges),
     AGG(Count_ranges_growth),
     AGG(OrderCount)
 FROM mv_DynamicSegmentation
@@ -300,13 +298,17 @@ WHERE (Year = '1998-01-01' OR Year = '1997-01-01') AND CustomerName LIKE '%61598
 GROUP BY ALL
 ORDER BY CustomerSegmentPerYearbyGrowth
 ```
+When the query covers several years (as in the example) and `Year` is not in the GROUP BY, you also have to decide how the per-year counts combine across years. Here we can engage `partition` block. Each choice answers a different business question:
+- **Sum across years**: *"How many annual tier benefit packages did we grant per tier over 1997–1998?"* (`include: [Year]` with `outer_aggregate: sum`, so a member is counted once for every year they hold the tier). Without a `partition` block, as in `AGG(Count_ranges)`, each member is counted only once for the whole period instead, so you get the number of beneficiaries (members who received at least one package) rather than the number of packages
+- **Average per year**: *"How many members does each tier hold in a typical year?"* (`outer_aggregate: avg`) as in `AGG(Count_ranges_growth)`
+ 
 
 <details>
 <summary>Test query output</summary>
 
 <img width="600" src="./images/CustomerSegmentPerYearbyGrowth.png" alt="Customers segmented per year by growth" />
 
-</details>
+</details> <br>
 
 > [!TIP]
 > Add `Year` to the query to see the split over years.
@@ -320,7 +322,7 @@ The Dynamic segmentation pattern is also useful for clustering customers based o
 
 If the assignment of the cluster to each customer is static, then this is better implemented through the [static segmentation](../Static%20segmentation/) pattern. However, if the assignment has to be dynamic but you do not want a customer to belong to different clusters over time, then the Dynamic segmentation pattern is the optimal choice.
 
-Like an airline's lifetime status, a member keeps the **best tier they ever achieved** across all years and is counted **once**, no matter the year in view. Rank the yearly tiers (HIGH = 3, MEDIUM = 2, LOW = 1), take the maximum per member with a window, then map it back to a label. Now count members by that lifetime tier.
+Like an airline's lifetime status, a member keeps the **best tier they ever achieved** across all years and keeps the **same lifetime status**, no matter the year in view. Rank the yearly tiers (HIGH = 3, MEDIUM = 2, LOW = 1), take the maximum per member with a window, then map it back to a label. Now count members by that lifetime tier.
 
 ### Measure definition
 
@@ -355,12 +357,13 @@ Like an airline's lifetime status, a member keeps the **best tier they ever achi
   comment: Counts the number of distinct customers by their all-time highest segment (INCLUDE LOD)
   expr: count(distinct CustomerName)
   partition:
-    include: [CustomerSegment]
-    outer_aggregate: sum
+    include: [Year]
+    outer_aggregate: avg
   format:
     type: number
     decimal_places:
-      type: all
+      type: exact
+      places: 0
     hide_group_separator: false
     abbreviation: none
 ```
@@ -380,15 +383,39 @@ WHERE (Year = '1998-01-01' OR Year = '1997-01-01') AND CustomerName = 'Customer#
 GROUP BY ALL
 ORDER BY Year
 ```
-The per-year tier can differ across the two years, while the lifetime tier stays fixed at the member's best-ever level. Remove the `CustomerName` filter and select `CustomerSegment` with `AGG(Count_highest_ranges)` to count members by lifetime status.
+
 
 <details>
 <summary>Test query output</summary>
 
 <img width="600" src="./images/CustomerSegmentPerYearbySegmentHighest.png" alt="Customers by all-time highest segment" />
+</details>   <br>
 
-</details>
+The per-year tier can change from one year to the next, but the lifetime status stays fixed at the member's best-ever tier.
 
+To size each lifetime status across several years, `Count_highest_ranges` uses the `partition` block. It counts members per status within each year (`include: [Year]`) and then averages those yearly counts (`outer_aggregate: avg`). This answers the business question *"In a typical year, how many of our active members hold each lifetime status?"*. For example: *"On average, how many lifetime-HIGH members do we serve each year?"*
+
+### Test query
+
+```sql
+SELECT
+    CustomerMaxRank,
+    CustomerSegment,
+    AGG(Count_highest_ranges)
+FROM mv_DynamicSegmentation
+WHERE (Year = '1998-01-01' OR Year = '1997-01-01') 
+GROUP BY ALL
+ORDER BY CustomerMaxRank
+```
+<details>
+<summary>Test query output</summary>
+
+<img width="600" src="./images/CustomerSegmentbySegmentHighestAVG.png" alt="AVG Customers by all-time highest segment" />
+
+</details>  <br>
+
+> [!TIP]
+> An average across years can be fractional. Use `decimal_places: {type: exact, places: 0}` in the measure's `format` to display it as a whole number. Only the display is rounded, not the value.
 
 ## End-to-end template
 

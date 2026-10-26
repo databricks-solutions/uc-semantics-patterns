@@ -2,6 +2,10 @@
 
 All notable changes to this project are documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.1] - 2026-10-23
+### Changed
+- **Dynamic segmentation** patterns - Reworked the population counts to show how per-year counts combine across a multi-year selection. `Count_ranges` is now a plain distinct count; `Count_ranges_growth` and `Count_highest_ranges` use `partition: {include: [Year], outer_aggregate: avg}` to give the average number of members per tier per year. The README explains which business question each aggregation answers (sum across years vs. average per year), adds a second lifetime-status test query with its output, and adds a tip on rounding fractional averages for display (`Count_highest_ranges` now shows whole numbers). README snippets are aligned with `Dynamic_segmentation.yml`.
+
 ## [1.4.0] - 2026-09-21
 ### Added
 - **Dynamic segmentation** patterns - Query-time customer segmentation into tiers by yearly sales (LOW/MEDIUM/HIGH), by year-over-year growth trajectory (DROP/STABLE/GROW/UNICORN), and by all-time highest (best-ever) tier — using measure-level `partition` (INCLUDE level-of-detail) counts.

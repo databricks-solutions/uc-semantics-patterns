@@ -193,9 +193,6 @@ measures:
     display_name: Customers in segment by year sales
     comment: Counts the number of distinct customers always including year segment (INCLUDE LOD)
     expr: count(distinct CustomerName)
-    partition:
-      include: [CustomerSegmentPerYear]
-      outer_aggregate: sum
     format:
       type: number
       decimal_places:
@@ -208,12 +205,13 @@ measures:
     comment: Counts the number of distinct customers by their all-time highest segment (INCLUDE LOD)
     expr: count(distinct CustomerName)
     partition:
-      include: [CustomerSegment]
-      outer_aggregate: sum
+      include: [Year]
+      outer_aggregate: avg
     format:
       type: number
       decimal_places:
-        type: all
+        type: exact
+        places: 0
       hide_group_separator: false
       abbreviation: none
 
@@ -222,8 +220,8 @@ measures:
     comment: Counts the number of distinct customers always including year segment based on growth (INCLUDE LOD)
     expr: count(distinct CustomerName)
     partition:
-      include: [CustomerSegmentPerYearbyGrowth]
-      outer_aggregate: sum
+      include: [Year]
+      outer_aggregate: avg
     format:
       type: number
       decimal_places:
