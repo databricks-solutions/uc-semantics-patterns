@@ -26,6 +26,7 @@ Whether you're building a governed semantic layer from scratch or extending an e
 | 04 | [Currency conversion](./Currency%20conversion/)               | Convert amounts into a user-selected reporting currency via query-time parameters, using historical FX rates                                    |
 | 05 | [Static segmentation](./Static%20segmentation/)               | Static price-band segmentation (global bands, per-category bands) and bands sourced from an external configuration table                        |
 | 06 | [Dynamic segmentation](./Dynamic%20segmentation/)             | Query-time customer segmentation into tiers by yearly sales, by year-over-year growth trajectory, and by all-time highest (best-ever) tier                       |
+| 07 | [Calendars](./Calendars/)                                     | Month-based fiscal calendar with a custom start month and the National Retail Federation (NRF) 4-5-4 retail calendar                            |
 
 ## :question: How to get help
 

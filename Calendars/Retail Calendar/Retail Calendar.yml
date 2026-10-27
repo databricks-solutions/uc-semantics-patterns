@@ -1,0 +1,177 @@
+version: 1.1
+comment: Unity Catalog semantics patterns - Retail (NRF 4-5-4) calendar
+
+source: orders
+
+joins:
+  - name: customer
+    source: customer
+    'on': source.o_custkey = customer.c_custkey
+    rely:
+      at_most_one_match: true
+    joins:
+      - name: nation
+        source: nation
+        'on': customer.c_nationkey = nation.n_nationkey
+        rely:
+          at_most_one_match: true
+        joins:
+          - name: region
+            source: region
+            'on': nation.n_regionkey = region.r_regionkey
+            rely:
+              at_most_one_match: true
+
+fields:
+  - name: RegionName
+    display_name: Region Name
+    expr: customer.nation.region.r_name
+
+  - name: CountryName
+    display_name: Country Name
+    expr: customer.nation.n_name
+
+  - name: CustomerName
+    display_name: Customer Name
+    expr: customer.c_name
+
+  - name: MarketSegment
+    display_name: Market Segment
+    expr: customer.c_mktsegment
+
+  - name: OrderDate
+    display_name: Order Date
+    expr: o_orderdate
+    format:
+      type: date
+      date_format: year_month_day
+      leading_zeros: true
+
+  - name: OrderPriority
+    display_name: Order Priority
+    expr: o_orderpriority
+
+  - name: ShipPriority
+    display_name: Ship Priority
+    expr: o_shippriority
+
+  - name: _FiscalAnchorCurrent
+    display_name: Fiscal Anchor (Current Cal Year)
+    comment: Internal helper - Sunday nearest Feb 1 of the order date's calendar year
+    expr: date_sub(date_add(make_date(year(`OrderDate`), 2, 1), 3), dayofweek(date_add(make_date(year(`OrderDate`), 2, 1), 3)) - 1)
+
+  - name: _FiscalAnchorPrior
+    display_name: Fiscal Anchor (Prior Cal Year)
+    comment: Internal helper - Sunday nearest Feb 1 of the previous calendar year
+    expr: date_sub(date_add(make_date(year(`OrderDate`) - 1, 2, 1), 3), dayofweek(date_add(make_date(year(`OrderDate`) - 1, 2, 1), 3)) - 1)
+
+  - name: RetailYearStart
+    display_name: Retail Year Start
+    comment: First day (Sunday) of the NRF retail year containing the order date
+    expr: CASE WHEN `OrderDate` >= `_FiscalAnchorCurrent` THEN `_FiscalAnchorCurrent` ELSE `_FiscalAnchorPrior` END
+    format:
+      type: date
+      date_format: year_month_day
+      leading_zeros: true
+
+  - name: RetailYear
+    display_name: Retail Year
+    comment: NRF fiscal year label (the year in which the retail year begins)
+    expr: year(`RetailYearStart`)
+
+  - name: RetailDayOfYear
+    display_name: Retail Day of Year
+    comment: 0-based day offset from the retail year start
+    expr: datediff(`OrderDate`, `RetailYearStart`)
+
+  - name: RetailWeek
+    display_name: Retail Week
+    comment: Retail week number 1..52 (53 in a 53-week year)
+    expr: floor(`RetailDayOfYear` / 7) + 1
+
+  - name: RetailQuarter
+    display_name: Retail Quarter
+    comment: Retail quarter 1..4 (13 weeks each, the 53rd week stays in Q4)
+    expr: least(floor((`RetailWeek` - 1) / 13) + 1, 4)
+
+  - name: RetailWeekInQuarter
+    display_name: Retail Week in Quarter
+    comment: Week position within the quarter, 1..13 (14 in the 53rd week)
+    expr: "`RetailWeek` - (`RetailQuarter` - 1) * 13"
+
+  - name: RetailPeriodInQuarter
+    display_name: Retail Period in Quarter
+    comment: 4-5-4 grouping - month position within the quarter (1..3)
+    expr: CASE WHEN `RetailWeekInQuarter` <= 4 THEN 1 WHEN `RetailWeekInQuarter` <= 9 THEN 2 ELSE 3 END
+
+  - name: RetailPeriod
+    display_name: Retail Period
+    comment: Retail period / month number 1..12
+    expr: (`RetailQuarter` - 1) * 3 + `RetailPeriodInQuarter`
+
+  - name: RetailWeekOfPeriod
+    display_name: Retail Week of Period
+    comment: Week position within the retail period (1..5)
+    expr: CASE `RetailPeriodInQuarter` WHEN 1 THEN `RetailWeekInQuarter` WHEN 2 THEN `RetailWeekInQuarter` - 4 ELSE `RetailWeekInQuarter` - 9 END
+
+  - name: RetailPeriodLabel
+    display_name: Retail Period Label
+    comment: Zero-padded period label, e.g. P01..P12
+    expr: concat('P', lpad(`RetailPeriod`, 2, '0'))
+
+  - name: RetailQuarterLabel
+    display_name: Retail Quarter Label
+    comment: Quarter label, e.g. Q1..Q4
+    expr: concat('Q', `RetailQuarter`)
+
+  - name: RetailYearPeriod
+    display_name: Retail Year-Period
+    comment: Sortable year+period key, e.g. 2024-P07
+    expr: concat(`RetailYear`, '-P', lpad(`RetailPeriod`, 2, '0'))
+
+  - name: RetailWeekStartDate
+    display_name: Retail Week Start Date
+    comment: Sunday that begins the retail week
+    expr: date_add(`RetailYearStart`, CAST((`RetailWeek` - 1) * 7 AS INT))
+    format:
+      type: date
+      date_format: year_month_day
+      leading_zeros: true
+
+measures:
+  - name: TotalPrice
+    display_name: Total Price
+    comment: Total Price across all orders in the period
+    expr: SUM(o_totalprice)
+    format:
+      type: currency
+      currency_code: USD
+      decimal_places:
+        type: exact
+        places: 2
+      hide_group_separator: false
+      abbreviation: none
+
+  - name: WeekCount
+    display_name: Weeks in Period
+    comment: Number of distinct retail weeks in the current grouping
+    expr: COUNT(DISTINCT `RetailWeekStartDate`)
+    format:
+      type: number
+      decimal_places:
+        type: all
+      hide_group_separator: false
+      abbreviation: none
+
+  - name: AvgWeeklySales
+    display_name: Average Weekly Sales
+    comment: Total Price divided by the number of retail weeks - comparable across 4-week and 5-week periods
+    expr: AGG(TotalPrice) / AGG(WeekCount)
+    format:
+      type: currency
+      currency_code: USD
+      decimal_places:
+        type: exact
+        places: 2
+      hide_group_separator: false
+      abbreviation: none

@@ -2,6 +2,10 @@
 
 All notable changes to this project are documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-10-23
+### Added
+- **Calendars** patterns - Custom reporting calendars derived inline from a single date field: a month-based Fiscal Calendar (custom start month, July 1 by default, fiscal year labelled by its end year; fiscal quarters, months, start dates, and labels) and the National Retail Federation (NRF) 4-5-4 Retail Calendar (retail years, quarters, periods, and weeks including 53-week years, with `WeekCount` and `AvgWeeklySales` measures for week-normalized comparisons). The folder README explains when to materialize a calendar table instead and lists other calendar types (4-4-5, 5-4-4, 13-period, ISO 8601, broadcast); both patterns link to the Time Intelligence patterns as next steps.
+
 ## [1.4.1] - 2026-10-23
 ### Changed
 - **Dynamic segmentation** patterns - Reworked the population counts to show how per-year counts combine across a multi-year selection. `Count_ranges` is now a plain distinct count; `Count_ranges_growth` and `Count_highest_ranges` use `partition: {include: [Year], outer_aggregate: avg}` to give the average number of members per tier per year. The README explains which business question each aggregation answers (sum across years vs. average per year), adds a second lifetime-status test query with its output, and adds a tip on rounding fractional averages for display (`Count_highest_ranges` now shows whole numbers). README snippets are aligned with `Dynamic_segmentation.yml`.
