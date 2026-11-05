@@ -1,0 +1,368 @@
+version: 1.1
+comment: Unity Catalog semantics patterns
+
+source: lineitem
+
+joins:
+  - name: orders
+    source: orders
+    'on': source.l_orderkey = orders.o_orderkey
+    rely:
+      at_most_one_match: true
+    joins:
+      - name: customer
+        source: customer
+        'on': orders.o_custkey = customer.c_custkey
+        rely:
+          at_most_one_match: true
+        joins:
+          - name: nation
+            source: nation
+            'on': customer.c_nationkey = nation.n_nationkey
+            rely:
+              at_most_one_match: true
+            joins:
+              - name: region
+                source: region
+                'on': nation.n_regionkey = region.r_regionkey
+                rely:
+                  at_most_one_match: true
+
+  - name: part
+    source: part
+    'on': source.l_partkey = part.p_partkey
+    rely:
+      at_most_one_match: true
+
+fields:
+  - name: RegionName
+    display_name: Region Name
+    expr: orders.customer.nation.region.r_name
+
+  - name: CountryName
+    display_name: Country Name
+    expr: orders.customer.nation.n_name
+
+  - name: ProductKey
+    display_name: Product Key
+    expr: l_partkey
+
+  - name: ProductName
+    display_name: Product Name
+    expr: part.p_name
+
+  - name: Brand
+    display_name: Brand
+    expr: part.p_brand
+
+  - name: ProductType
+    display_name: Product Type
+    expr: part.p_type
+
+  - name: OrderDate
+    display_name: Order Date
+    expr: orders.o_orderdate
+    format:
+      type: date
+      date_format: year_month_day
+      leading_zeros: true
+
+  - name: Year
+    display_name: Order Year
+    expr: "DATE_TRUNC('year', orders.o_orderdate)"
+    format:
+      type: date
+      date_format: year_month_day
+      leading_zeros: true
+
+  - name: Month
+    display_name: Order Month
+    expr: "DATE_TRUNC('month', orders.o_orderdate)"
+    format:
+      type: date
+      date_format: year_month_day
+      leading_zeros: true
+
+  - name: Quarter
+    display_name: Order Quarter
+    expr: "DATE_TRUNC('quarter', orders.o_orderdate)"
+    format:
+      type: date
+      date_format: year_month_day
+      leading_zeros: true
+
+  - name: NetSales
+    display_name: Net Sales
+    comment: Line revenue after discount
+    expr: l_extendedprice * (1 - l_discount)
+    format:
+      type: currency
+      currency_code: USD
+      decimal_places:
+        type: exact
+        places: 2
+      hide_group_separator: false
+      abbreviation: none
+
+  # ===========================================
+  # ABC classification dimensions
+  # ===========================================
+
+  # ABC class based on the year's sales
+  - name: ProductTotal
+    display_name: Product Total
+    expr: SUM(NetSales) OVER (PARTITION BY ProductKey, `Year`)
+    format:
+      type: currency
+      currency_code: USD
+      decimal_places:
+        type: exact
+        places: 2
+      hide_group_separator: false
+      abbreviation: none
+
+  - name: YearTotal
+    display_name: Year Total
+    expr: SUM(NetSales) OVER (PARTITION BY `Year`)
+    format:
+      type: currency
+      currency_code: USD
+      decimal_places:
+        type: exact
+        places: 2
+      hide_group_separator: false
+      abbreviation: none
+
+  - name: CumulativeSalesPct
+    display_name: Cumulative Sales %
+    comment: Running share of the year's sales from the top product down to and including the current product
+    expr: SUM(NetSales) OVER (PARTITION BY `Year` ORDER BY ProductTotal DESC) / YearTotal
+    format:
+      type: percentage
+      decimal_places:
+        type: exact
+        places: 2
+      hide_group_separator: false
+
+  - name: SalesAbovePct
+    display_name: Sales Above %
+    comment: Share of the year's sales held by the products ranked above the current product (ties excluded)
+    expr: >-
+      (SUM(NetSales) OVER (PARTITION BY `Year` ORDER BY ProductTotal DESC)
+       - SUM(NetSales) OVER (PARTITION BY `Year`, ProductTotal))
+      / YearTotal
+    format:
+      type: percentage
+      decimal_places:
+        type: exact
+        places: 2
+      hide_group_separator: false
+
+  - name: ABCClassPerYear
+    display_name: ABC Class Per Year
+    expr: >-
+      CASE
+        WHEN SalesAbovePct<0.7 THEN 'A'
+        WHEN SalesAbovePct<0.9 THEN 'B'
+        ELSE 'C'
+      END
+
+  # ABC class movement versus the prior year, and outcome in the next year
+  - name: ABCClassRank
+    display_name: ABC Class Rank
+    comment: ABC class rank based on the year's sales
+    expr: >-
+      CASE
+        WHEN ABCClassPerYear = 'A' THEN 3
+        WHEN ABCClassPerYear = 'B' THEN 2
+        ELSE 1
+      END
+
+  - name: ABCClassRank_PY
+    display_name: ABC Class Rank PY
+    expr: MAX(ABCClassRank) OVER (PARTITION BY ProductKey ORDER BY `Year` RANGE BETWEEN INTERVAL 1 YEAR PRECEDING AND INTERVAL 1 YEAR PRECEDING)
+
+  - name: FirstSalesYear
+    display_name: First Sales Year
+    expr: MIN(`Year`) OVER (PARTITION BY ProductKey)
+    format:
+      type: date
+      date_format: year_month_day
+      leading_zeros: true
+
+  - name: ABCClassMovement
+    display_name: ABC Class Movement
+    expr: >-
+      CASE
+        WHEN ABCClassRank_PY IS NULL AND `Year` = FirstSalesYear THEN 'NEW'
+        WHEN ABCClassRank_PY IS NULL THEN 'REACTIVATED'
+        WHEN ABCClassRank>ABCClassRank_PY THEN 'UPGRADED'
+        WHEN ABCClassRank<ABCClassRank_PY THEN 'DOWNGRADED'
+        ELSE 'UNCHANGED'
+      END
+
+  - name: ABCClassRank_NY
+    display_name: ABC Class Rank NY
+    expr: MAX(ABCClassRank) OVER (PARTITION BY ProductKey ORDER BY `Year` RANGE BETWEEN INTERVAL 1 YEAR FOLLOWING AND INTERVAL 1 YEAR FOLLOWING)
+
+  - name: LastDataYear
+    display_name: Last Data Year
+    expr: MAX(`Year`) OVER ()
+    format:
+      type: date
+      date_format: year_month_day
+      leading_zeros: true
+
+  - name: ABCClassNextYear
+    display_name: ABC Class Next Year
+    expr: >-
+      CASE
+        WHEN `Year` = LastDataYear THEN NULL
+        WHEN ABCClassRank_NY = 3 THEN 'A'
+        WHEN ABCClassRank_NY = 2 THEN 'B'
+        WHEN ABCClassRank_NY = 1 THEN 'C'
+        ELSE 'LOST'
+      END
+
+  # Best ABC class reached so far, and over all years
+  - name: BestABCRankToDate
+    display_name: Best ABC rank to date
+    expr: MAX(ABCClassRank) OVER (PARTITION BY ProductKey ORDER BY `Year`)
+
+  - name: ABCClassBestToDate
+    display_name: ABC class (best to date)
+    expr: >-
+      CASE
+        WHEN BestABCRankToDate = 3 THEN 'A'
+        WHEN BestABCRankToDate = 2 THEN 'B'
+        ELSE 'C'
+      END
+
+  - name: BestABCRankAllTime
+    display_name: Best ABC rank all time
+    expr: MAX(ABCClassRank) OVER (PARTITION BY ProductKey)
+
+  - name: ABCClassBestAllTime
+    display_name: ABC class (best all time)
+    expr: >-
+      CASE
+        WHEN BestABCRankAllTime = 3 THEN 'A'
+        WHEN BestABCRankAllTime = 2 THEN 'B'
+        ELSE 'C'
+      END
+
+  # Pareto class by share of products (top 20% / next 30% / bottom 50%)
+  # Only the first line of each product in the year is flagged with 1, so summing the flag counts every product once.
+  - name: ProductFirstLineFlag
+    display_name: Product First Line Flag
+    expr: CASE WHEN ROW_NUMBER() OVER (PARTITION BY ProductKey, `Year` ORDER BY l_orderkey, l_linenumber) = 1 THEN 1 ELSE 0 END
+
+  - name: CumulativeProductPct
+    display_name: Cumulative Product %
+    comment: Share of the year's products with sales greater than or equal to the current product
+    expr: >-
+      SUM(ProductFirstLineFlag) OVER (PARTITION BY `Year` ORDER BY ProductTotal DESC)
+      / SUM(ProductFirstLineFlag) OVER (PARTITION BY `Year`)
+    format:
+      type: percentage
+      decimal_places:
+        type: exact
+        places: 2
+      hide_group_separator: false
+
+  - name: ProductsAbovePct
+    display_name: Products Above %
+    comment: Share of the year's products ranked above the current product (ties excluded)
+    expr: >-
+      (SUM(ProductFirstLineFlag) OVER (PARTITION BY `Year` ORDER BY ProductTotal DESC)
+       - SUM(ProductFirstLineFlag) OVER (PARTITION BY `Year`, ProductTotal))
+      / SUM(ProductFirstLineFlag) OVER (PARTITION BY `Year`)
+    format:
+      type: percentage
+      decimal_places:
+        type: exact
+        places: 2
+      hide_group_separator: false
+
+  - name: ParetoClassPerYear
+    display_name: Pareto Class Per Year
+    expr: >-
+      CASE
+        WHEN ProductsAbovePct<0.2 THEN 'A'
+        WHEN ProductsAbovePct<0.5 THEN 'B'
+        ELSE 'C'
+      END
+
+measures:
+  - name: TotalSales
+    display_name: Total Sales
+    comment: Net sales (extended price after discount) across all order lines in the period
+    expr: SUM(NetSales)
+    format:
+      type: currency
+      currency_code: USD
+      decimal_places:
+        type: exact
+        places: 2
+      hide_group_separator: false
+      abbreviation: none
+
+  - name: QuantitySold
+    display_name: Quantity Sold
+    comment: Units sold across all order lines in the period
+    expr: SUM(l_quantity)
+    format:
+      type: number
+      decimal_places:
+        type: all
+      hide_group_separator: false
+      abbreviation: none
+
+  - name: SalesShareOfYear
+    display_name: Sales Share of Year
+    comment: Share of the year's total sales; NULL when the result row spans more than one year
+    expr: >-
+      CASE
+        WHEN COUNT(DISTINCT `Year`) = 1 THEN SUM(NetSales) / ANY_VALUE(YearTotal)
+      END
+    format:
+      type: percentage
+      decimal_places:
+        type: exact
+        places: 2
+      hide_group_separator: false
+
+  - name: Count_class
+    display_name: Products in class
+    comment: Counts the number of distinct products in the class
+    expr: COUNT(DISTINCT ProductKey)
+    format:
+      type: number
+      decimal_places:
+        type: all
+      hide_group_separator: false
+      abbreviation: none
+
+  - name: Count_class_per_year
+    display_name: Products in class per year (avg)
+    comment: Product-years in the class divided by the number of years in the query, so years without any product in the class count as zero
+    expr: COUNT(DISTINCT ProductKey, `Year`) / MAX(COUNT(DISTINCT `Year`)) OVER ()
+    format:
+      type: number
+      decimal_places:
+        type: exact
+        places: 0
+      hide_group_separator: false
+      abbreviation: none
+
+  # Rank within ABC class (dynamic ranking measure, see the Ranking patterns)
+  - name: RankInClass
+    display_name: Rank in class
+    comment: Position of the product by sales within its ABC class and year; requires Year and ABCClassPerYear in the GROUP BY
+    expr: RANK() OVER (PARTITION BY `Year`, ABCClassPerYear ORDER BY SUM(NetSales) DESC)
+    format:
+      type: number
+      decimal_places:
+        type: all
+      hide_group_separator: false
+      abbreviation: none

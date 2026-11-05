@@ -21,7 +21,15 @@ This repository is maintained by Databricks and intended for contributions from 
 │   ├── Period-to-date growth/           # YOYTD, QOQTD, MOMTD, WOWTD
 │   └── Moving calculations/             # Rolling/trailing window totals and averages
 ├── Semi-additive calculations/          # Opening/closing balances, first/last date values
-└── Currency conversion/                 # Query-time currency conversion via parameters, real historical FX rates
+├── Ranking/                             # Dynamic and static ranking (RANK, DENSE_RANK, NTILE, ...)
+├── Currency conversion/                 # Query-time currency conversion via parameters, real historical FX rates
+├── Static segmentation/                 # Fixed price bands, per-category bands, bands from a configuration table
+├── Dynamic segmentation/                # Query-time tiers by yearly sales, growth trajectory, best-ever tier
+├── Calendars/                           # Custom reporting calendars
+│   ├── README.md                        # Domain overview and TOC
+│   ├── Fiscal Calendar/                 # Month-based fiscal calendar with a custom start month
+│   └── Retail Calendar/                 # NRF 4-5-4 retail calendar
+└── ABC classification/                  # Product ABC classes, movement, best class, Pareto by count
 ```
 
 
@@ -98,6 +106,10 @@ Screenshots of test query output should be rendered with a fixed display width s
 | PMC     | Previous month complete                                              |
 | PP      | Previous period (automatically selects year, quarter, or month)      |
 | PYMAT   | Previous year moving annual total                                    |
+| NY      | Next year                                                            |
+| NQ      | Next quarter                                                         |
+| NM      | Next month                                                           |
+| NW      | Next week                                                            |
 | YoY     | Year-over-year                                                       |
 | QoQ     | Quarter-over-quarter                                                 |
 | MoM     | Month-over-month                                                     |

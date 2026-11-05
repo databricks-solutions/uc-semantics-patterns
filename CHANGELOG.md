@@ -2,6 +2,10 @@
 
 All notable changes to this project are documented in this file. The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-10-30
+### Added
+- **ABC classification** patterns - Rewritten on the principles of the Dynamic segmentation patterns: the A/B/C class is now a dimension built from fixed level-of-detail window fields, so it can be grouped, filtered, and counted. The source is now `lineitem` (joined to `orders` and `part`), and the pattern classifies products by yearly net sales. The class is tested on the share of sales held by the products above, so class A is never empty and tied products share a class. New patterns: rank within class (`RankInClass`, linked to the Ranking patterns), class movement (UPGRADED/DOWNGRADED/UNCHANGED/NEW/REACTIVATED), next-year class with LOST and a class migration matrix, best class to date and over all time, and Pareto by product count using an exact first-line flag. `Count_class_per_year` counts years without members as zero, and `SalesShareOfYear` returns NULL when a row spans several years. The README covers partial years (test queries use 1996–1997), thresholds from a configuration table or parameters, and query cost. The metric view in test queries is renamed to `mv_ABCClassification`, and screenshots are replaced.
+
 ## [1.5.0] - 2026-10-23
 ### Added
 - **Calendars** patterns - Custom reporting calendars derived inline from a single date field: a month-based Fiscal Calendar (custom start month, July 1 by default, fiscal year labelled by its end year; fiscal quarters, months, start dates, and labels) and the National Retail Federation (NRF) 4-5-4 Retail Calendar (retail years, quarters, periods, and weeks including 53-week years, with `WeekCount` and `AvgWeeklySales` measures for week-normalized comparisons). The folder README explains when to materialize a calendar table instead and lists other calendar types (4-4-5, 5-4-4, 13-period, ISO 8601, broadcast); both patterns link to the Time Intelligence patterns as next steps.
